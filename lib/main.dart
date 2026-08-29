@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -54,12 +54,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   // ==========================================================
-  // GEMINI API KEY
-  // ==========================================================
-
-  
-
-  // ==========================================================
   // FILE
   // ==========================================================
 
@@ -104,45 +98,69 @@ class _HomePageState extends State<HomePage> {
   // ==========================================================
 
   Future<void> pickResume() async {
-    final FilePickerResult? result =
-        await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf'],
-      withData: true,
-    );
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        withData: false,
+      );
 
-    if (result == null) return;
+      if (result.isEmpty) {
+        return;
+      }
 
-    final selectedFile = result.files.single;
+      final selectedFile = result.first;
 
-    setState(() {
-      fileName = selectedFile.name;
-      fileBytes = selectedFile.bytes;
+      // Use XFile instead of PlatformFile.path or PlatformFile.bytes.
+      // This works on Web and Android and also supports files selected
+      // from cloud providers such as OneDrive.
+      final xFile = selectedFile.xFile;
+      final Uint8List bytes = await xFile.readAsBytes();
 
-      resumeText = "";
+      if (bytes.isEmpty) {
+        setState(() {
+          fileName = "Could not read selected PDF";
+          fileBytes = null;
+        });
+        return;
+      }
 
-      analysisResult = "";
+      setState(() {
+        fileName = selectedFile.name;
+        fileBytes = bytes;
 
-      resumeScore = 0;
+        resumeText = "";
+        analysisResult = "";
+        resumeScore = 0;
 
-      summary = "";
-      skills = "";
-      strengths = "";
-      weaknesses = "";
-      projects = "";
-      education = "";
-      jobRoles = "";
-      suggestions = "";
+        summary = "";
+        skills = "";
+        strengths = "";
+        weaknesses = "";
+        projects = "";
+        education = "";
+        jobRoles = "";
+        suggestions = "";
 
-      technicalScore = 0;
-      projectScore = 0;
-      educationScore = 0;
-      experienceScore = 0;
-      atsScore = 0;
-      communicationScore = 0;
-    });
+        technicalScore = 0;
+        projectScore = 0;
+        educationScore = 0;
+        experienceScore = 0;
+        atsScore = 0;
+        communicationScore = 0;
+      });
 
-    debugPrint("PDF selected: $fileName");
+      debugPrint("PDF selected: $fileName");
+      debugPrint("PDF bytes loaded: ${bytes.length}");
+    } catch (e) {
+      debugPrint("PDF selection error: $e");
+
+      setState(() {
+        fileName = "Error reading PDF";
+        fileBytes = null;
+        analysisResult = "Could not read the PDF:\n$e";
+      });
+    }
   }
 
   // ==========================================================
@@ -278,8 +296,7 @@ class _HomePageState extends State<HomePage> {
         lower.contains("project") ||
         lower.contains("projects");
 
-    final projectTechnologyCount =
-        countMatches(
+    final projectTechnologyCount = countMatches(
       text,
       [
         "java",
@@ -300,8 +317,7 @@ class _HomePageState extends State<HomePage> {
       ],
     );
 
-    final hasProjectDescription =
-        containsAny(
+    final hasProjectDescription = containsAny(
       text,
       [
         "developed",
@@ -348,8 +364,7 @@ class _HomePageState extends State<HomePage> {
 
     final lower = text.toLowerCase();
 
-    final hasDegree =
-        containsAny(
+    final hasDegree = containsAny(
       text,
       [
         "b.tech",
@@ -364,8 +379,7 @@ class _HomePageState extends State<HomePage> {
       ],
     );
 
-    final hasCollege =
-        containsAny(
+    final hasCollege = containsAny(
       text,
       [
         "college",
@@ -375,8 +389,7 @@ class _HomePageState extends State<HomePage> {
       ],
     );
 
-    final hasSchool =
-        containsAny(
+    final hasSchool = containsAny(
       text,
       [
         "class 10",
@@ -389,8 +402,7 @@ class _HomePageState extends State<HomePage> {
       ],
     );
 
-    final hasPercentage =
-        containsAny(
+    final hasPercentage = containsAny(
       text,
       [
         "%",
@@ -416,7 +428,6 @@ class _HomePageState extends State<HomePage> {
       score += 2;
     }
 
-    // Year / batch information
     if (RegExp(r'20\d{2}').hasMatch(lower)) {
       score += 1;
     }
@@ -432,8 +443,7 @@ class _HomePageState extends State<HomePage> {
   int calculateExperienceScore(String text) {
     int score = 0;
 
-    final hasExperience =
-        containsAny(
+    final hasExperience = containsAny(
       text,
       [
         "experience",
@@ -444,8 +454,7 @@ class _HomePageState extends State<HomePage> {
       ],
     );
 
-    final hasAchievements =
-        containsAny(
+    final hasAchievements = containsAny(
       text,
       [
         "achievement",
@@ -462,8 +471,7 @@ class _HomePageState extends State<HomePage> {
       ],
     );
 
-    final hasLeadership =
-        containsAny(
+    final hasLeadership = containsAny(
       text,
       [
         "leadership",
@@ -499,7 +507,6 @@ class _HomePageState extends State<HomePage> {
 
     final lower = text.toLowerCase();
 
-    // Contact information
     if (RegExp(
       r'[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}',
       caseSensitive: false,
@@ -507,14 +514,12 @@ class _HomePageState extends State<HomePage> {
       score += 2;
     }
 
-    // Phone number
     if (RegExp(
       r'\b\d{10}\b',
     ).hasMatch(text.replaceAll(' ', ''))) {
       score += 2;
     }
 
-    // Important resume sections
     final sections = [
       "education",
       "skills",
@@ -541,7 +546,6 @@ class _HomePageState extends State<HomePage> {
       score += 2;
     }
 
-    // GitHub / LinkedIn
     if (containsAny(
       text,
       [
@@ -552,7 +556,6 @@ class _HomePageState extends State<HomePage> {
       score += 2;
     }
 
-    // Resume keywords
     if (containsAny(
       text,
       [
@@ -579,7 +582,6 @@ class _HomePageState extends State<HomePage> {
 
     final lower = text.toLowerCase();
 
-    // Summary / objective
     if (containsAny(
       text,
       [
@@ -591,7 +593,6 @@ class _HomePageState extends State<HomePage> {
       score += 3;
     }
 
-    // Languages
     if (containsAny(
       text,
       [
@@ -604,7 +605,6 @@ class _HomePageState extends State<HomePage> {
       score += 2;
     }
 
-    // Soft skills
     final softSkills = [
       "communication",
       "teamwork",
@@ -627,7 +627,6 @@ class _HomePageState extends State<HomePage> {
       score += 2;
     }
 
-    // Action-oriented words
     final actionWords = [
       "developed",
       "created",
@@ -650,7 +649,6 @@ class _HomePageState extends State<HomePage> {
       score += 1;
     }
 
-    // Avoid extremely short extracted resumes
     if (lower.length > 500) {
       score += 2;
     }
@@ -694,33 +692,35 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ==========================================================
-  // GEMINI ANALYSIS
+  // BACKEND / GEMINI ANALYSIS
   // ==========================================================
 
   Future<String> getGeminiAnalysis(
-  String text,
-) async {
-  final response = await http.post(
-    Uri.parse('http://localhost:3000/analyze'),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: jsonEncode({
-      'resumeText': text,
-    }),
-  );
-
-  if (response.statusCode != 200) {
-    throw Exception(
-      'Backend error: ${response.statusCode}',
+    String text,
+  ) async {
+    final response = await http.post(
+      Uri.parse(
+        'https://ai-resume-analyzer-1-e03n.onrender.com/analyze',
+      ),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'resumeText': text,
+      }),
     );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Backend error: ${response.statusCode}',
+      );
+    }
+
+    final data = jsonDecode(response.body);
+
+    return data['analysis'] ??
+        'No analysis was returned.';
   }
-
-  final data = jsonDecode(response.body);
-
-  return data['analysis'] ??
-      'No analysis was returned.';
-}
 
   // ==========================================================
   // PARSE AI RESPONSE
@@ -861,15 +861,13 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    
-
     setState(() {
       isAnalyzing = true;
       analysisResult = "";
     });
 
     try {
-      // Extract resume
+      // Extract resume text
       final extracted =
           await extractPdfText();
 
@@ -891,8 +889,7 @@ class _HomePageState extends State<HomePage> {
       );
 
       // ======================================================
-      // IMPORTANT:
-      // SCORE IS CALCULATED DIRECTLY FROM RESUME TEXT
+      // LOCAL PLACEMENT SCORE
       // ======================================================
 
       calculatePlacementScore(
@@ -928,7 +925,7 @@ class _HomePageState extends State<HomePage> {
       );
 
       // ======================================================
-      // GEMINI QUALITATIVE ANALYSIS
+      // SEND RESUME TEXT TO BACKEND
       // ======================================================
 
       final result =
@@ -1025,14 +1022,14 @@ class _HomePageState extends State<HomePage> {
         crossAxisAlignment:
             CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
               Icon(
                 Icons.bar_chart,
                 color: Colors.blue,
               ),
-              const SizedBox(width: 10),
-              const Text(
+              SizedBox(width: 10),
+              Text(
                 "Score Breakdown",
                 style: TextStyle(
                   fontSize: 20,
@@ -1042,39 +1039,32 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-
           const SizedBox(height: 20),
-
           scoreRow(
             "Technical Skills",
             technicalScore,
             20,
           ),
-
           scoreRow(
             "Projects",
             projectScore,
             20,
           ),
-
           scoreRow(
             "Education",
             educationScore,
             15,
           ),
-
           scoreRow(
             "Experience & Achievements",
             experienceScore,
             15,
           ),
-
           scoreRow(
             "ATS & Resume Quality",
             atsScore,
             15,
           ),
-
           scoreRow(
             "Communication & Presentation",
             communicationScore,
@@ -1124,9 +1114,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-
           const SizedBox(height: 7),
-
           ClipRRect(
             borderRadius:
                 BorderRadius.circular(10),
@@ -1194,9 +1182,7 @@ class _HomePageState extends State<HomePage> {
                   FontWeight.bold,
             ),
           ),
-
           const SizedBox(height: 20),
-
           SizedBox(
             width: 150,
             height: 150,
@@ -1221,7 +1207,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                 ),
-
                 Column(
                   mainAxisAlignment:
                       MainAxisAlignment.center,
@@ -1236,7 +1221,6 @@ class _HomePageState extends State<HomePage> {
                             getScoreColor(),
                       ),
                     ),
-
                     const Text(
                       "Score",
                       style: TextStyle(
@@ -1249,9 +1233,7 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-
           const SizedBox(height: 18),
-
           Text(
             getReadinessText(),
             textAlign:
@@ -1312,9 +1294,7 @@ class _HomePageState extends State<HomePage> {
                 icon,
                 color: Colors.blue,
               ),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Text(
                   title,
@@ -1328,9 +1308,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-
           const SizedBox(height: 15),
-
           Text(
             content,
             style:
@@ -1384,9 +1362,7 @@ class _HomePageState extends State<HomePage> {
                   pw.FontWeight.bold,
             ),
           ),
-
           pw.SizedBox(height: 7),
-
           pw.Text(
             cleanForPdf(content),
             style:
@@ -1424,9 +1400,7 @@ class _HomePageState extends State<HomePage> {
                     pw.FontWeight.bold,
               ),
             ),
-
             pw.SizedBox(height: 8),
-
             pw.Text(
               "Resume: $fileName",
               style:
@@ -1434,11 +1408,8 @@ class _HomePageState extends State<HomePage> {
                 fontSize: 12,
               ),
             ),
-
             pw.Divider(),
-
             pw.SizedBox(height: 15),
-
             pw.Text(
               "Placement Readiness Score: "
               "$resumeScore / 100",
@@ -1448,9 +1419,7 @@ class _HomePageState extends State<HomePage> {
                     pw.FontWeight.bold,
               ),
             ),
-
             pw.SizedBox(height: 8),
-
             pw.Text(
               getReadinessText(),
               style:
@@ -1458,9 +1427,7 @@ class _HomePageState extends State<HomePage> {
                 fontSize: 12,
               ),
             ),
-
             pw.SizedBox(height: 20),
-
             pw.Text(
               "Score Breakdown",
               style: pw.TextStyle(
@@ -1469,85 +1436,66 @@ class _HomePageState extends State<HomePage> {
                     pw.FontWeight.bold,
               ),
             ),
-
             pw.SizedBox(height: 10),
-
             pw.Text(
               "Technical Skills: "
               "$technicalScore / 20",
             ),
-
             pw.Text(
               "Projects: "
               "$projectScore / 20",
             ),
-
             pw.Text(
               "Education: "
               "$educationScore / 15",
             ),
-
             pw.Text(
               "Experience & Achievements: "
               "$experienceScore / 15",
             ),
-
             pw.Text(
               "ATS & Resume Quality: "
               "$atsScore / 15",
             ),
-
             pw.Text(
               "Communication & Presentation: "
               "$communicationScore / 15",
             ),
-
             pw.SizedBox(height: 25),
-
             pdfSection(
               "Professional Summary",
               summary,
             ),
-
             pdfSection(
               "Skills Found",
               skills,
             ),
-
             pdfSection(
               "Strengths",
               strengths,
             ),
-
             pdfSection(
               "Missing / Weak Skills",
               weaknesses,
             ),
-
             pdfSection(
               "Project Analysis",
               projects,
             ),
-
             pdfSection(
               "Education",
               education,
             ),
-
             pdfSection(
               "Suitable Job Roles",
               jobRoles,
             ),
-
             pdfSection(
               "Improvement Suggestions",
               suggestions,
             ),
-
             pw.SizedBox(height: 20),
-
             pw.Divider(),
-
             pw.Text(
               "Generated by AI Resume Analyzer",
               style:
@@ -1585,7 +1533,6 @@ class _HomePageState extends State<HomePage> {
         ),
         centerTitle: true,
       ),
-
       body: SingleChildScrollView(
         padding:
             const EdgeInsets.all(20),
@@ -1629,11 +1576,9 @@ class _HomePageState extends State<HomePage> {
                         color:
                             Colors.white,
                       ),
-
                       const SizedBox(
                         height: 12,
                       ),
-
                       const Text(
                         "AI Resume Analyzer",
                         style:
@@ -1645,11 +1590,9 @@ class _HomePageState extends State<HomePage> {
                               Colors.white,
                         ),
                       ),
-
                       const SizedBox(
                         height: 8,
                       ),
-
                       Text(
                         "Analyze your resume with AI",
                         style:
@@ -1691,11 +1634,9 @@ class _HomePageState extends State<HomePage> {
                         size: 50,
                         color: Colors.red,
                       ),
-
                       const SizedBox(
                         height: 10,
                       ),
-
                       Text(
                         fileName,
                         textAlign:
@@ -1707,11 +1648,9 @@ class _HomePageState extends State<HomePage> {
                               FontWeight.w600,
                         ),
                       ),
-
                       const SizedBox(
                         height: 15,
                       ),
-
                       SizedBox(
                         width:
                             double.infinity,
@@ -1732,11 +1671,9 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
-
                       const SizedBox(
                         height: 12,
                       ),
-
                       SizedBox(
                         width:
                             double.infinity,
@@ -1789,11 +1726,9 @@ class _HomePageState extends State<HomePage> {
                     child: Column(
                       children: [
                         CircularProgressIndicator(),
-
                         SizedBox(
                           height: 15,
                         ),
-
                         Text(
                           "AI is analyzing your resume...",
                           style: TextStyle(
@@ -1872,10 +1807,6 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(
                         height: 10,
                       ),
-
-                      // =================================================
-                      // DOWNLOAD PDF
-                      // =================================================
 
                       SizedBox(
                         width:
