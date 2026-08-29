@@ -1,13 +1,13 @@
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'dart:convert';
 
-import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 void main() {
   runApp(const ResumeAnalyzerApp());
@@ -27,10 +27,11 @@ class ResumeAnalyzerApp extends StatelessWidget {
       title: 'AI Resume Analyzer',
       theme: ThemeData(
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF6F8FC),
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF2563EB),
         ),
-        scaffoldBackgroundColor: const Color(0xFFF5F7FB),
+        fontFamily: 'Arial',
       ),
       home: const HomePage(),
     );
@@ -48,19 +49,13 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-// ============================================================
-// STATE
-// ============================================================
-
 class _HomePageState extends State<HomePage> {
   // ==========================================================
   // FILE
   // ==========================================================
 
   String fileName = "No resume selected";
-
   Uint8List? fileBytes;
-
   String resumeText = "";
 
   // ==========================================================
@@ -68,7 +63,6 @@ class _HomePageState extends State<HomePage> {
   // ==========================================================
 
   String analysisResult = "";
-
   bool isAnalyzing = false;
 
   int resumeScore = 0;
@@ -105,15 +99,10 @@ class _HomePageState extends State<HomePage> {
         withData: false,
       );
 
-      if (result.isEmpty) {
-        return;
-      }
+      if (result.isEmpty) return;
 
       final selectedFile = result.first;
 
-      // Use XFile instead of PlatformFile.path or PlatformFile.bytes.
-      // This works on Web and Android and also supports files selected
-      // from cloud providers such as OneDrive.
       final xFile = selectedFile.xFile;
       final Uint8List bytes = await xFile.readAsBytes();
 
@@ -164,13 +153,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ==========================================================
-  // EXTRACT TEXT FROM PDF
+  // EXTRACT PDF TEXT
   // ==========================================================
 
   Future<String> extractPdfText() async {
-    if (fileBytes == null) {
-      return "";
-    }
+    if (fileBytes == null) return "";
 
     final PdfDocument document = PdfDocument(
       inputBytes: fileBytes!,
@@ -197,7 +184,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ==========================================================
-  // CHECK KEYWORDS
+  // KEYWORD HELPERS
   // ==========================================================
 
   bool containsAny(
@@ -207,14 +194,9 @@ class _HomePageState extends State<HomePage> {
     final lower = text.toLowerCase();
 
     return keywords.any(
-      (keyword) =>
-          lower.contains(keyword.toLowerCase()),
+      (keyword) => lower.contains(keyword.toLowerCase()),
     );
   }
-
-  // ==========================================================
-  // COUNT KEYWORDS
-  // ==========================================================
 
   int countMatches(
     String text,
@@ -234,7 +216,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ==========================================================
-  // CALCULATE TECHNICAL SKILLS
+  // TECHNICAL SCORE
   // MAX = 20
   // ==========================================================
 
@@ -284,10 +266,10 @@ class _HomePageState extends State<HomePage> {
     return 0;
   }
 
-  // ==========================================================
-  // CALCULATE PROJECT SCORE
+  // ============================================================
+  // PROJECT SCORE
   // MAX = 20
-  // ==========================================================
+  // ============================================================
 
   int calculateProjectScore(String text) {
     final lower = text.toLowerCase();
@@ -333,31 +315,21 @@ class _HomePageState extends State<HomePage> {
       ],
     );
 
-    if (!hasProjectSection) {
-      return 0;
-    }
+    if (!hasProjectSection) return 0;
 
     int score = 8;
 
-    if (projectTechnologyCount >= 2) {
-      score += 4;
-    }
-
-    if (projectTechnologyCount >= 4) {
-      score += 3;
-    }
-
-    if (hasProjectDescription) {
-      score += 3;
-    }
+    if (projectTechnologyCount >= 2) score += 4;
+    if (projectTechnologyCount >= 4) score += 3;
+    if (hasProjectDescription) score += 3;
 
     return math.min(score, 20);
   }
 
-  // ==========================================================
-  // CALCULATE EDUCATION SCORE
+  // ============================================================
+  // EDUCATION SCORE
   // MAX = 15
-  // ==========================================================
+  // ============================================================
 
   int calculateEducationScore(String text) {
     int score = 0;
@@ -412,21 +384,10 @@ class _HomePageState extends State<HomePage> {
       ],
     );
 
-    if (hasDegree) {
-      score += 7;
-    }
-
-    if (hasCollege) {
-      score += 3;
-    }
-
-    if (hasSchool) {
-      score += 2;
-    }
-
-    if (hasPercentage) {
-      score += 2;
-    }
+    if (hasDegree) score += 7;
+    if (hasCollege) score += 3;
+    if (hasSchool) score += 2;
+    if (hasPercentage) score += 2;
 
     if (RegExp(r'20\d{2}').hasMatch(lower)) {
       score += 1;
@@ -435,10 +396,10 @@ class _HomePageState extends State<HomePage> {
     return math.min(score, 15);
   }
 
-  // ==========================================================
-  // EXPERIENCE & ACHIEVEMENTS
+  // ============================================================
+  // EXPERIENCE SCORE
   // MAX = 15
-  // ==========================================================
+  // ============================================================
 
   int calculateExperienceScore(String text) {
     int score = 0;
@@ -482,25 +443,17 @@ class _HomePageState extends State<HomePage> {
       ],
     );
 
-    if (hasExperience) {
-      score += 7;
-    }
-
-    if (hasAchievements) {
-      score += 5;
-    }
-
-    if (hasLeadership) {
-      score += 3;
-    }
+    if (hasExperience) score += 7;
+    if (hasAchievements) score += 5;
+    if (hasLeadership) score += 3;
 
     return math.min(score, 15);
   }
 
-  // ==========================================================
-  // ATS & RESUME QUALITY
+  // ============================================================
+  // ATS SCORE
   // MAX = 15
-  // ==========================================================
+  // ============================================================
 
   int calculateAtsScore(String text) {
     int score = 0;
@@ -514,9 +467,8 @@ class _HomePageState extends State<HomePage> {
       score += 2;
     }
 
-    if (RegExp(
-      r'\b\d{10}\b',
-    ).hasMatch(text.replaceAll(' ', ''))) {
+    if (RegExp(r'\b\d{10}\b')
+        .hasMatch(text.replaceAll(' ', ''))) {
       score += 2;
     }
 
@@ -546,13 +498,7 @@ class _HomePageState extends State<HomePage> {
       score += 2;
     }
 
-    if (containsAny(
-      text,
-      [
-        "github",
-        "linkedin",
-      ],
-    )) {
+    if (containsAny(text, ["github", "linkedin"])) {
       score += 2;
     }
 
@@ -572,10 +518,10 @@ class _HomePageState extends State<HomePage> {
     return math.min(score, 15);
   }
 
-  // ==========================================================
-  // COMMUNICATION & PRESENTATION
+  // ============================================================
+  // COMMUNICATION SCORE
   // MAX = 15
-  // ==========================================================
+  // ============================================================
 
   int calculateCommunicationScore(String text) {
     int score = 0;
@@ -649,16 +595,14 @@ class _HomePageState extends State<HomePage> {
       score += 1;
     }
 
-    if (lower.length > 500) {
-      score += 2;
-    }
+    if (lower.length > 500) score += 2;
 
     return math.min(score, 15);
   }
 
-  // ==========================================================
-  // CALCULATE COMPLETE SCORE
-  // ==========================================================
+  // ============================================================
+  // COMPLETE SCORE
+  // ============================================================
 
   void calculatePlacementScore(String text) {
     technicalScore =
@@ -687,17 +631,14 @@ class _HomePageState extends State<HomePage> {
         atsScore +
         communicationScore;
 
-    resumeScore =
-        math.min(resumeScore, 100);
+    resumeScore = math.min(resumeScore, 100);
   }
 
-  // ==========================================================
-  // BACKEND / GEMINI ANALYSIS
-  // ==========================================================
+  // ============================================================
+  // BACKEND / GEMINI
+  // ============================================================
 
-  Future<String> getGeminiAnalysis(
-    String text,
-  ) async {
+  Future<String> getGeminiAnalysis(String text) async {
     final response = await http.post(
       Uri.parse(
         'https://ai-resume-analyzer-1-e03n.onrender.com/analyze',
@@ -722,9 +663,9 @@ class _HomePageState extends State<HomePage> {
         'No analysis was returned.';
   }
 
-  // ==========================================================
+  // ============================================================
   // PARSE AI RESPONSE
-  // ==========================================================
+  // ============================================================
 
   void parseAnalysis(String result) {
     analysisResult = result;
@@ -763,9 +704,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // ==========================================================
+  // ============================================================
   // EXTRACT SECTION
-  // ==========================================================
+  // ============================================================
 
   String extractSection(
     String text,
@@ -784,9 +725,7 @@ class _HomePageState extends State<HomePage> {
     final match =
         sectionRegex.firstMatch(normalized);
 
-    if (match == null) {
-      return "";
-    }
+    if (match == null) return "";
 
     final start = match.end;
 
@@ -847,9 +786,9 @@ class _HomePageState extends State<HomePage> {
     return value.trim();
   }
 
-  // ==========================================================
+  // ============================================================
   // START ANALYSIS
-  // ==========================================================
+  // ============================================================
 
   Future<void> startAnalysis() async {
     if (fileBytes == null) {
@@ -857,7 +796,6 @@ class _HomePageState extends State<HomePage> {
         analysisResult =
             "Please upload a resume first.";
       });
-
       return;
     }
 
@@ -867,7 +805,6 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      // Extract resume text
       final extracted =
           await extractPdfText();
 
@@ -877,64 +814,18 @@ class _HomePageState extends State<HomePage> {
           analysisResult =
               "Could not extract text from this PDF.";
         });
-
         return;
       }
 
       resumeText =
           normalizeText(extracted);
 
-      debugPrint(
-        "Resume text extracted successfully.",
-      );
-
-      // ======================================================
-      // LOCAL PLACEMENT SCORE
-      // ======================================================
-
-      calculatePlacementScore(
-        resumeText,
-      );
-
-      debugPrint(
-        "Technical: $technicalScore / 20",
-      );
-
-      debugPrint(
-        "Projects: $projectScore / 20",
-      );
-
-      debugPrint(
-        "Education: $educationScore / 15",
-      );
-
-      debugPrint(
-        "Experience: $experienceScore / 15",
-      );
-
-      debugPrint(
-        "ATS: $atsScore / 15",
-      );
-
-      debugPrint(
-        "Communication: $communicationScore / 15",
-      );
-
-      debugPrint(
-        "TOTAL: $resumeScore / 100",
-      );
-
-      // ======================================================
-      // SEND RESUME TEXT TO BACKEND
-      // ======================================================
+      calculatePlacementScore(resumeText);
 
       final result =
           await getGeminiAnalysis(
         resumeText,
       );
-
-      debugPrint("AI ANALYSIS:");
-      debugPrint(result);
 
       parseAnalysis(result);
 
@@ -946,16 +837,15 @@ class _HomePageState extends State<HomePage> {
 
       setState(() {
         isAnalyzing = false;
-
         analysisResult =
             "Something went wrong:\n\n$e";
       });
     }
   }
 
-  // ==========================================================
-  // SCORE COLOR
-  // ==========================================================
+  // ============================================================
+  // SCORE HELPERS
+  // ============================================================
 
   Color getScoreColor() {
     if (resumeScore >= 80) {
@@ -968,10 +858,6 @@ class _HomePageState extends State<HomePage> {
 
     return Colors.red;
   }
-
-  // ==========================================================
-  // READINESS TEXT
-  // ==========================================================
 
   String getReadinessText() {
     if (resumeScore >= 80) {
@@ -993,159 +879,174 @@ class _HomePageState extends State<HomePage> {
     return "Early Stage – Needs Significant Improvement";
   }
 
-  // ==========================================================
-  // SCORE BREAKDOWN CARD
-  // ==========================================================
+  // ============================================================
+  // GRADIENT
+  // ============================================================
 
-  Widget scoreBreakdownCard() {
+  LinearGradient primaryGradient() {
+    return const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        Color(0xFF2563EB),
+        Color(0xFF4F46E5),
+      ],
+    );
+  }
+
+  // ============================================================
+  // UPLOAD CARD
+  // ============================================================
+
+  Widget uploadCard() {
     return Container(
       width: double.infinity,
-      margin:
-          const EdgeInsets.only(bottom: 20),
-      padding:
-          const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+        ),
         boxShadow: [
           BoxShadow(
-            color:
-                Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset:
-                const Offset(0, 4),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.bar_chart,
-                color: Colors.blue,
-              ),
-              SizedBox(width: 10),
-              Text(
-                "Score Breakdown",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight:
-                      FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          scoreRow(
-            "Technical Skills",
-            technicalScore,
-            20,
-          ),
-          scoreRow(
-            "Projects",
-            projectScore,
-            20,
-          ),
-          scoreRow(
-            "Education",
-            educationScore,
-            15,
-          ),
-          scoreRow(
-            "Experience & Achievements",
-            experienceScore,
-            15,
-          ),
-          scoreRow(
-            "ATS & Resume Quality",
-            atsScore,
-            15,
-          ),
-          scoreRow(
-            "Communication & Presentation",
-            communicationScore,
-            15,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================================
-  // SCORE ROW
-  // ==========================================================
-
-  Widget scoreRow(
-    String title,
-    int score,
-    int maxScore,
-  ) {
-    return Padding(
-      padding:
-          const EdgeInsets.only(bottom: 18),
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style:
-                    const TextStyle(
-                  fontSize: 15,
-                  fontWeight:
-                      FontWeight.w500,
-                ),
-              ),
-              Text(
-                "$score / $maxScore",
-                style:
-                    const TextStyle(
-                  fontWeight:
-                      FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 7),
-          ClipRRect(
-            borderRadius:
-                BorderRadius.circular(10),
-            child:
-                LinearProgressIndicator(
-              minHeight: 7,
-              value:
-                  maxScore == 0
-                      ? 0
-                      : score / maxScore,
-              backgroundColor:
-                  Colors.grey.shade200,
-              valueColor:
-                  AlwaysStoppedAnimation<
-                      Color>(
-                score >= maxScore * .7
-                    ? Colors.green
-                    : score >= maxScore * .4
-                        ? Colors.orange
-                        : Colors.blue,
-              ),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEEEE),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: const Icon(
+              Icons.picture_as_pdf_rounded,
+              size: 42,
+              color: Color(0xFFEF4444),
             ),
           ),
+          const SizedBox(height: 18),
+          const Text(
+            "Upload your resume",
+            style: TextStyle(
+              fontSize: 23,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            "Upload a PDF resume and get an AI-powered analysis",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 22),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.description_outlined,
+                  color: Color(0xFF2563EB),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    fileName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed:
+                      isAnalyzing ? null : pickResume,
+                  icon: const Icon(
+                    Icons.upload_file_rounded,
+                  ),
+                  label: const Text(
+                    "Choose PDF",
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize:
+                        const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed:
+                      isAnalyzing
+                          ? null
+                          : startAnalysis,
+                  icon: isAnalyzing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child:
+                              CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.auto_awesome,
+                        ),
+                  label: Text(
+                    isAnalyzing
+                        ? "Analyzing..."
+                        : "Analyze Resume",
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    minimumSize:
+                        const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  // ==========================================================
-  // MAIN SCORE CARD
-  // ==========================================================
+  // ============================================================
+  // SCORE CARD
+  // ============================================================
 
   Widget scoreCard() {
     if (resumeScore == 0) {
@@ -1154,21 +1055,16 @@ class _HomePageState extends State<HomePage> {
 
     return Container(
       width: double.infinity,
-      margin:
-          const EdgeInsets.only(bottom: 20),
-      padding:
-          const EdgeInsets.all(25),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(20),
+        gradient: primaryGradient(),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color:
-                Colors.black.withOpacity(0.06),
-            blurRadius: 12,
-            offset:
-                const Offset(0, 5),
+            color: const Color(0xFF2563EB)
+                .withOpacity(0.25),
+            blurRadius: 25,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -1177,73 +1073,74 @@ class _HomePageState extends State<HomePage> {
           const Text(
             "Placement Readiness",
             style: TextStyle(
-              fontSize: 21,
-              fontWeight:
-                  FontWeight.bold,
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: 150,
-            height: 150,
-            child: Stack(
-              alignment:
-                  Alignment.center,
-              children: [
-                SizedBox(
-                  width: 150,
-                  height: 150,
-                  child:
-                      CircularProgressIndicator(
-                    value:
-                        resumeScore / 100,
-                    strokeWidth: 13,
-                    backgroundColor:
-                        Colors.grey.shade200,
-                    valueColor:
-                        AlwaysStoppedAnimation<
-                            Color>(
-                      getScoreColor(),
-                    ),
+          const SizedBox(height: 5),
+          Text(
+            "Your resume performance at a glance",
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.8),
+            ),
+          ),
+          const SizedBox(height: 28),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 170,
+                height: 170,
+                child: CircularProgressIndicator(
+                  value: resumeScore / 100,
+                  strokeWidth: 14,
+                  backgroundColor:
+                      Colors.white.withOpacity(0.18),
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(
+                    Colors.white,
                   ),
                 ),
-                Column(
-                  mainAxisAlignment:
-                      MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "$resumeScore%",
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight:
-                            FontWeight.bold,
-                        color:
-                            getScoreColor(),
-                      ),
+              ),
+              Column(
+                children: [
+                  Text(
+                    "$resumeScore",
+                    style: const TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
-                    const Text(
-                      "Score",
-                      style: TextStyle(
-                        color:
-                            Colors.grey,
-                      ),
+                  ),
+                  Text(
+                    "/ 100",
+                    style: TextStyle(
+                      color:
+                          Colors.white.withOpacity(0.75),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: 18),
-          Text(
-            getReadinessText(),
-            textAlign:
-                TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight:
-                  FontWeight.bold,
-              color:
-                  getScoreColor(),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 10,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Text(
+              getReadinessText(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -1251,14 +1148,229 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // ==========================================================
-  // RESULT SECTION CARD
-  // ==========================================================
+  // ============================================================
+  // SCORE BREAKDOWN
+  // ============================================================
 
-  Widget sectionCard(
+  Widget scoreBreakdownCard() {
+    return dashboardCard(
+      title: "Score Breakdown",
+      subtitle:
+          "How your resume performs across key areas",
+      icon: Icons.bar_chart_rounded,
+      child: Column(
+        children: [
+          scoreRow(
+            "Technical Skills",
+            technicalScore,
+            20,
+            Icons.code_rounded,
+          ),
+          scoreRow(
+            "Projects",
+            projectScore,
+            20,
+            Icons.folder_copy_outlined,
+          ),
+          scoreRow(
+            "Education",
+            educationScore,
+            15,
+            Icons.school_outlined,
+          ),
+          scoreRow(
+            "Experience & Achievements",
+            experienceScore,
+            15,
+            Icons.workspace_premium_outlined,
+          ),
+          scoreRow(
+            "ATS & Resume Quality",
+            atsScore,
+            15,
+            Icons.fact_check_outlined,
+          ),
+          scoreRow(
+            "Communication",
+            communicationScore,
+            15,
+            Icons.forum_outlined,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // SCORE ROW
+  // ============================================================
+
+  Widget scoreRow(
     String title,
+    int score,
+    int maxScore,
     IconData icon,
+  ) {
+    final percentage =
+        maxScore == 0 ? 0.0 : score / maxScore;
+
+    return Padding(
+      padding:
+          const EdgeInsets.only(bottom: 18),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color:
+                      const Color(0xFFEFF6FF),
+                  borderRadius:
+                      BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  size: 19,
+                  color:
+                      const Color(0xFF2563EB),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                "$score / $maxScore",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          ClipRRect(
+            borderRadius:
+                BorderRadius.circular(20),
+            child: LinearProgressIndicator(
+              minHeight: 8,
+              value: percentage,
+              backgroundColor:
+                  const Color(0xFFE5E7EB),
+              valueColor:
+                  AlwaysStoppedAnimation<Color>(
+                percentage >= .7
+                    ? Colors.green
+                    : percentage >= .4
+                        ? Colors.orange
+                        : Colors.red,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // DASHBOARD CARD
+  // ============================================================
+
+  Widget dashboardCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Widget child,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 18,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color:
+                      const Color(0xFFEFF6FF),
+                  borderRadius:
+                      BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color:
+                      const Color(0xFF2563EB),
+                ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 19,
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color:
+                            Colors.grey.shade600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          child,
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // RESULT SECTION
+  // ============================================================
+
+  Widget resultSection(
+    String title,
     String content,
+    IconData icon,
+    Color accent,
   ) {
     if (content.trim().isEmpty) {
       return const SizedBox.shrink();
@@ -1268,53 +1380,64 @@ class _HomePageState extends State<HomePage> {
       width: double.infinity,
       margin:
           const EdgeInsets.only(bottom: 16),
-      padding:
-          const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius:
-            BorderRadius.circular(16),
+            BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+        ),
         boxShadow: [
           BoxShadow(
             color:
-                Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset:
-                const Offset(0, 4),
+                Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment:
             CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                color: Colors.blue,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: accent.withOpacity(0.1),
+              borderRadius:
+                  BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: accent,
+            ),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
                   title,
-                  style:
-                      const TextStyle(
-                    fontSize: 19,
+                  style: const TextStyle(
+                    fontSize: 18,
                     fontWeight:
                         FontWeight.bold,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 15),
-          Text(
-            content,
-            style:
-                const TextStyle(
-              fontSize: 15,
-              height: 1.6,
+                const SizedBox(height: 10),
+                Text(
+                  content,
+                  style: TextStyle(
+                    color: Colors.grey.shade800,
+                    fontSize: 14.5,
+                    height: 1.65,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1322,9 +1445,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // ==========================================================
-  // CLEAN PDF TEXT
-  // ==========================================================
+  // ============================================================
+  // PDF CLEAN
+  // ============================================================
 
   String cleanForPdf(String text) {
     return text
@@ -1333,9 +1456,9 @@ class _HomePageState extends State<HomePage> {
         .trim();
   }
 
-  // ==========================================================
+  // ============================================================
   // PDF SECTION
-  // ==========================================================
+  // ============================================================
 
   pw.Widget pdfSection(
     String title,
@@ -1375,9 +1498,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // ==========================================================
-  // DOWNLOAD ANALYSIS PDF
-  // ==========================================================
+  // ============================================================
+  // DOWNLOAD PDF
+  // ============================================================
 
   Future<void> downloadAnalysisPdf() async {
     if (analysisResult.trim().isEmpty) {
@@ -1514,227 +1637,178 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // ==========================================================
-  // UI
-  // ==========================================================
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor:
-            Colors.white,
-        title: const Text(
-          "AI Resume Analyzer",
-          style: TextStyle(
-            fontWeight:
-                FontWeight.bold,
-          ),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        titleSpacing: 20,
+        title: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                gradient: primaryGradient(),
+                borderRadius:
+                    BorderRadius.circular(11),
+              ),
+              child: const Icon(
+                Icons.auto_awesome,
+                color: Colors.white,
+                size: 21,
+              ),
+            ),
+            const SizedBox(width: 11),
+            const Text(
+              "AI Resume Analyzer",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 19,
+              ),
+            ),
+          ],
         ),
-        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding:
-            const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Center(
           child: ConstrainedBox(
             constraints:
                 const BoxConstraints(
-              maxWidth: 900,
+              maxWidth: 950,
             ),
             child: Column(
               children: [
-                const SizedBox(height: 15),
+                const SizedBox(height: 10),
 
                 // =================================================
-                // HEADER
+                // HERO
                 // =================================================
 
                 Container(
                   width: double.infinity,
                   padding:
-                      const EdgeInsets.all(25),
-                  decoration:
-                      BoxDecoration(
-                    gradient:
-                        const LinearGradient(
-                      colors: [
-                        Color(0xFF2563EB),
-                        Color(0xFF4F46E5),
-                      ],
-                    ),
+                      const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    gradient: primaryGradient(),
                     borderRadius:
-                        BorderRadius.circular(
-                      20,
-                    ),
+                        BorderRadius.circular(26),
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            const Color(0xFF2563EB)
+                                .withOpacity(0.20),
+                        blurRadius: 25,
+                        offset:
+                            const Offset(0, 10),
+                      ),
+                    ],
                   ),
                   child: Column(
                     children: [
-                      const Icon(
-                        Icons.auto_awesome,
-                        size: 55,
-                        color:
-                            Colors.white,
+                      Container(
+                        width: 66,
+                        height: 66,
+                        decoration:
+                            BoxDecoration(
+                          color: Colors.white
+                              .withOpacity(0.14),
+                          borderRadius:
+                              BorderRadius.circular(
+                            20,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.auto_awesome,
+                          size: 34,
+                          color: Colors.white,
+                        ),
                       ),
-                      const SizedBox(
-                        height: 12,
-                      ),
+                      const SizedBox(height: 17),
                       const Text(
-                        "AI Resume Analyzer",
-                        style:
-                            TextStyle(
-                          fontSize: 28,
+                        "Analyze Your Resume with AI",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 30,
                           fontWeight:
                               FontWeight.bold,
-                          color:
-                              Colors.white,
                         ),
                       ),
-                      const SizedBox(
-                        height: 8,
-                      ),
+                      const SizedBox(height: 9),
                       Text(
-                        "Analyze your resume with AI",
-                        style:
-                            TextStyle(
+                        "Get actionable insights, placement readiness scores "
+                        "and personalized career recommendations.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
                           color: Colors.white
-                              .withOpacity(
-                            0.9,
-                          ),
+                              .withOpacity(0.85),
+                          fontSize: 14.5,
+                          height: 1.5,
                         ),
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(
-                  height: 20,
-                ),
+                const SizedBox(height: 22),
 
                 // =================================================
-                // UPLOAD CARD
+                // UPLOAD
                 // =================================================
 
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.all(20),
-                  decoration:
-                      BoxDecoration(
-                    color: Colors.white,
-                    borderRadius:
-                        BorderRadius.circular(
-                      16,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      const Icon(
-                        Icons.picture_as_pdf,
-                        size: 50,
-                        color: Colors.red,
-                      ),
-                      const SizedBox(
-                        height: 10,
-                      ),
-                      Text(
-                        fileName,
-                        textAlign:
-                            TextAlign.center,
-                        style:
-                            const TextStyle(
-                          fontSize: 16,
-                          fontWeight:
-                              FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(
-                        height: 15,
-                      ),
-                      SizedBox(
-                        width:
-                            double.infinity,
-                        child:
-                            ElevatedButton
-                                .icon(
-                          onPressed:
-                              isAnalyzing
-                                  ? null
-                                  : pickResume,
-                          icon:
-                              const Icon(
-                            Icons.upload_file,
-                          ),
-                          label:
-                              const Text(
-                            "Choose PDF Resume",
-                          ),
-                        ),
-                      ),
-                      const SizedBox(
-                        height: 12,
-                      ),
-                      SizedBox(
-                        width:
-                            double.infinity,
-                        child:
-                            ElevatedButton
-                                .icon(
-                          onPressed:
-                              isAnalyzing
-                                  ? null
-                                  : startAnalysis,
-                          icon:
-                              isAnalyzing
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child:
-                                          CircularProgressIndicator(
-                                        strokeWidth:
-                                            2,
-                                        color:
-                                            Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.analytics,
-                                    ),
-                          label: Text(
-                            isAnalyzing
-                                ? "Analyzing..."
-                                : "Analyze Resume",
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                uploadCard(),
 
-                const SizedBox(
-                  height: 25,
-                ),
+                const SizedBox(height: 25),
 
                 // =================================================
                 // LOADING
                 // =================================================
 
                 if (isAnalyzing)
-                  const Padding(
+                  Container(
+                    width: double.infinity,
+                    margin:
+                        const EdgeInsets.only(
+                      bottom: 22,
+                    ),
                     padding:
-                        EdgeInsets.all(25),
+                        const EdgeInsets.all(25),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                          BorderRadius.circular(
+                        20,
+                      ),
+                    ),
                     child: Column(
                       children: [
-                        CircularProgressIndicator(),
-                        SizedBox(
-                          height: 15,
-                        ),
-                        Text(
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        const Text(
                           "AI is analyzing your resume...",
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight:
                                 FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          "Extracting skills, projects and placement insights",
+                          textAlign:
+                              TextAlign.center,
+                          style: TextStyle(
+                            color:
+                                Colors.grey.shade600,
+                            fontSize: 13,
                           ),
                         ),
                       ],
@@ -1746,92 +1820,104 @@ class _HomePageState extends State<HomePage> {
                 // =================================================
 
                 if (!isAnalyzing &&
-                    analysisResult.isNotEmpty)
-                  Column(
-                    children: [
-                      scoreCard(),
+                    analysisResult.isNotEmpty) ...[
+                  scoreCard(),
+                  scoreBreakdownCard(),
 
-                      scoreBreakdownCard(),
+                  resultSection(
+                    "Professional Summary",
+                    summary,
+                    Icons.person_outline_rounded,
+                    Colors.blue,
+                  ),
 
-                      sectionCard(
-                        "Professional Summary",
-                        Icons.person_outline,
-                        summary,
+                  resultSection(
+                    "Skills Found",
+                    skills,
+                    Icons.code_rounded,
+                    Colors.indigo,
+                  ),
+
+                  resultSection(
+                    "Strengths",
+                    strengths,
+                    Icons.thumb_up_alt_outlined,
+                    Colors.green,
+                  ),
+
+                  resultSection(
+                    "Missing / Weak Skills",
+                    weaknesses,
+                    Icons.warning_amber_rounded,
+                    Colors.orange,
+                  ),
+
+                  resultSection(
+                    "Project Analysis",
+                    projects,
+                    Icons.folder_outlined,
+                    Colors.deepPurple,
+                  ),
+
+                  resultSection(
+                    "Education",
+                    education,
+                    Icons.school_outlined,
+                    Colors.teal,
+                  ),
+
+                  resultSection(
+                    "Suitable Job Roles",
+                    jobRoles,
+                    Icons.work_outline_rounded,
+                    Colors.blue,
+                  ),
+
+                  resultSection(
+                    "Improvement Suggestions",
+                    suggestions,
+                    Icons.lightbulb_outline_rounded,
+                    Colors.amber.shade800,
+                  ),
+
+                  const SizedBox(height: 5),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed:
+                          downloadAnalysisPdf,
+                      icon: const Icon(
+                        Icons.picture_as_pdf_rounded,
                       ),
-
-                      sectionCard(
-                        "Skills Found",
-                        Icons.code,
-                        skills,
+                      label: const Text(
+                        "Download Analysis as PDF",
                       ),
-
-                      sectionCard(
-                        "Strengths",
-                        Icons
-                            .thumb_up_alt_outlined,
-                        strengths,
-                      ),
-
-                      sectionCard(
-                        "Missing / Weak Skills",
-                        Icons
-                            .warning_amber_outlined,
-                        weaknesses,
-                      ),
-
-                      sectionCard(
-                        "Project Analysis",
-                        Icons.folder_outlined,
-                        projects,
-                      ),
-
-                      sectionCard(
-                        "Education",
-                        Icons.school_outlined,
-                        education,
-                      ),
-
-                      sectionCard(
-                        "Suitable Job Roles",
-                        Icons.work_outline,
-                        jobRoles,
-                      ),
-
-                      sectionCard(
-                        "Improvement Suggestions",
-                        Icons
-                            .lightbulb_outline,
-                        suggestions,
-                      ),
-
-                      const SizedBox(
-                        height: 10,
-                      ),
-
-                      SizedBox(
-                        width:
-                            double.infinity,
-                        child:
-                            ElevatedButton
-                                .icon(
-                          onPressed:
-                              downloadAnalysisPdf,
-                          icon:
-                              const Icon(
-                            Icons.picture_as_pdf,
-                          ),
-                          label:
-                              const Text(
-                            "Download Analysis as PDF",
+                      style:
+                          ElevatedButton.styleFrom(
+                        backgroundColor:
+                            const Color(
+                          0xFF111827,
+                        ),
+                        foregroundColor:
+                            Colors.white,
+                        minimumSize:
+                            const Size.fromHeight(
+                          54,
+                        ),
+                        shape:
+                            RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(
+                            15,
                           ),
                         ),
                       ),
-
-                      const SizedBox(
-                        height: 30,
-                      ),
-                    ],
+                    ),
                   ),
+
+                  const SizedBox(height: 30),
+                ],
               ],
             ),
           ),
