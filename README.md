@@ -171,3 +171,30 @@ B.Tech – Computer Science & Information Technology
 ## 📄 License
 
 This project is created for educational and portfolio purposes.
+
+## 📸 Screenshots
+
+### 1. Home Screen
+
+![Home Screen](lib/screenshots/Screenshot%202026-08-29%20142954.png)
+
+### 2. Resume Upload
+
+![Resume Upload](lib/screenshots/Screenshot%202026-08-29%20143105.png)
+
+### 3. Placement Readiness Score
+
+![Placement Score](lib/screenshots/Screenshot%202026-08-29%20143144.png)
+
+### 4. Score Breakdown
+
+![Score Breakdown](lib/screenshots/Screenshot%202026-08-29%20143221.png)
+
+### 5. AI Resume Analysis
+
+![AI Analysis](lib/screenshots/Screenshot%202026-08-29%20143250.png)
+
+### 6. Analysis Report
+
+![Analysis Report](lib/screenshots/Screenshot%202026-08-29%20143532.png)
+
